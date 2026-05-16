@@ -28,6 +28,15 @@ body {
   overflow-x: hidden;
 }
 
+.route-loading {
+  display: grid;
+  min-height: 100vh;
+  place-items: center;
+  color: #7dd3fc;
+  background: #020617;
+  font-weight: 800;
+}
+
 button,
 a {
   -webkit-tap-highlight-color: transparent;

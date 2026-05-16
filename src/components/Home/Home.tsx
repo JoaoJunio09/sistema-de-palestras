@@ -1,3 +1,4 @@
+import { Link } from "react-router-dom";
 import { homePageContent } from "../../content/HomeContent";
 
 import './Home.css';
@@ -11,14 +12,20 @@ function Home() {
 
           <p>{homePageContent.description}</p>
 
-          <a className="hero-cta" href={homePageContent.ctaHref}>
-            {homePageContent.ctaLabel}
-          </a>
+          <div className="hero-actions">
+            <Link className="hero-cta" to={homePageContent.ctaHref}>
+              {homePageContent.ctaLabel}
+            </Link>
+
+            <Link className="hero-cta hero-cta-secondary" to="/login">
+              Já estou inscrito, entrar
+            </Link>
+          </div>
         </div>
 
         <div className="hero-visual" aria-hidden="true">
           <div className="visual-card visual-card-primary">
-            <span>ETEC - Frei Arnaldo Maria de Itaporanga</span>
+            <span>ETEC Frei Arnaldo Maria de Itaporanga</span>
             <strong>2026</strong>
           </div>
 

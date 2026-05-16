@@ -10,5 +10,5 @@ export const homePageContent: HomePageContent = {
   description:
     "Uma semana de palestras, oficinas e experiências para conectar estudantes a novas ideias, profissões, tecnologia e futuro.",
   ctaLabel: "Inscreva-se na semana acadêmica 2026",
-  ctaHref: "/inscricao",
+  ctaHref: "/login",
 };

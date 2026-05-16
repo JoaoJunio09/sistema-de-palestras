@@ -1,12 +1,20 @@
+import { lazy, Suspense } from "react";
 import { BrowserRouter, Route, Routes } from "react-router-dom";
 import HomePage from "./pages/Home/HomePage";
+
+const LoginPage = lazy(() => import("./pages/Login/LoginPage"));
+const InscriptionPage = lazy(() => import("./pages/Inscription/InscriptionPage"));
 
 function RoutesApp() {
 	return (
 		<BrowserRouter>
-			<Routes>
-				<Route path="/" element={<HomePage />} />
-			</Routes>
+			<Suspense fallback={<div className="route-loading">Carregando...</div>}>
+				<Routes>
+					<Route path="/" element={<HomePage />} />
+					<Route path="/login" element={<LoginPage />} />
+					<Route path="/:studentSlug/inscricao" element={<InscriptionPage />} />
+				</Routes>
+			</Suspense>
 		</BrowserRouter>
 	)
 }
