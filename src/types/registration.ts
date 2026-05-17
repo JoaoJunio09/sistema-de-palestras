@@ -18,6 +18,7 @@ export type StudentRegistration = {
   activityDescription: string;
   dayId: string;
   dateLabel: string;
+  activityPeriod: CoursePeriod;
   shift: ActivityShift;
   shiftLabel: string;
   room: string;

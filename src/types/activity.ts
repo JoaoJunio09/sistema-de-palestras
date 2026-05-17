@@ -1,3 +1,5 @@
+import type { CoursePeriod } from "./student";
+
 export type ActivityType = "Palestra" | "Oficina";
 
 export type ActivityShift = "morning" | "afternoon" | "night";
@@ -11,6 +13,7 @@ export type AcademicActivity = {
   description: string;
   dayId: string;
   dateLabel: string;
+  period: CoursePeriod;
   shift: ActivityShift;
   shiftLabel: string;
   room: string;
@@ -22,6 +25,7 @@ export type AcademicDay = {
   id: string;
   dateLabel: string;
   title: string;
+  tabLabel: string;
   activities: AcademicActivity[];
 };
 

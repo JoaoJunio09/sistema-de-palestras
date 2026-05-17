@@ -20,6 +20,7 @@ import { buildStudentPanelPath } from "../../utils/studentSlug";
 import "./InscriptionPage.css";
 
 type PageStatus = "checking" | "ready" | "missing-config";
+type ConfirmationStep = "warning" | "typing";
 
 function buildSlotKey(activity: AcademicActivity) {
   return `${activity.dayId}_${activity.shift}`;
@@ -37,6 +38,10 @@ export default function InscriptionPage() {
     () => new Map<string, ActivityAvailability>(),
   );
   const [selectedActivityId, setSelectedActivityId] = useState("");
+  const [selectedDayId, setSelectedDayId] = useState(() => academicDays[0]?.id ?? "");
+  const [pendingActivity, setPendingActivity] = useState<AcademicActivity | null>(null);
+  const [confirmationStep, setConfirmationStep] = useState<ConfirmationStep>("warning");
+  const [confirmationText, setConfirmationText] = useState("");
   const [feedback, setFeedback] = useState("");
 
   const selectedActivityIds = useMemo(() => {
@@ -52,6 +57,31 @@ export default function InscriptionPage() {
   const selectedGroupIds = useMemo(() => {
     return new Set(registrations.map((registration) => registration.activityGroupId));
   }, [registrations]);
+
+  const availableDays = useMemo(() => {
+    if (!studentProfile) {
+      return [];
+    }
+
+    return academicDays
+      .map((day) => ({
+        ...day,
+        activities: day.activities.filter((activity) => {
+          return activity.period === studentProfile.period;
+        }),
+      }))
+      .filter((day) => day.activities.length > 0);
+  }, [studentProfile]);
+
+  const activeDayId = useMemo(() => {
+    const hasSelectedDay = availableDays.some((day) => day.id === selectedDayId);
+
+    return hasSelectedDay ? selectedDayId : availableDays[0]?.id ?? "";
+  }, [availableDays, selectedDayId]);
+
+  const visibleDays = useMemo(() => {
+    return availableDays.filter((day) => day.id === activeDayId);
+  }, [activeDayId, availableDays]);
 
   async function loadRegistrationState(userId: string) {
     const activities = getAllAcademicActivities();
@@ -158,6 +188,34 @@ export default function InscriptionPage() {
     }
   }
 
+  function openConfirmation(activity: AcademicActivity) {
+    setPendingActivity(activity);
+    setConfirmationStep("warning");
+    setConfirmationText("");
+    setFeedback("");
+  }
+
+  function closeConfirmation() {
+    if (selectedActivityId) {
+      return;
+    }
+
+    setPendingActivity(null);
+    setConfirmationStep("warning");
+    setConfirmationText("");
+  }
+
+  async function handleFinalConfirmation() {
+    if (!pendingActivity || confirmationText !== "Confirmar") {
+      return;
+    }
+
+    await handleRegister(pendingActivity);
+    setPendingActivity(null);
+    setConfirmationStep("warning");
+    setConfirmationText("");
+  }
+
   function getButtonState(activity: AcademicActivity) {
     const availability = availabilityMap.get(activity.id);
     const filledSpots = availability?.filledSpots ?? 0;
@@ -220,9 +278,9 @@ export default function InscriptionPage() {
             </Link>
             <h1 id="inscription-title">Escolha suas palestras e oficinas</h1>
             <p>
-              Você pode escolher apenas uma atividade por turno. Se a mesma
-              palestra ou oficina aparecer em mais de um horário, escolha apenas
-              uma das opções.
+              Você está visualizando apenas atividades do seu período. Escolha
+              com atenção: depois de confirmar uma inscrição, ela não poderá ser
+              alterada ou removida pelo aluno.
             </p>
           </div>
 
@@ -235,8 +293,25 @@ export default function InscriptionPage() {
 
         {feedback ? <p className="inscription-feedback">{feedback}</p> : null}
 
+        <nav className="day-filter-tabs" aria-label="Filtrar atividades por dia">
+          {availableDays.map((day) => (
+            <button
+              className={
+                activeDayId === day.id
+                  ? "day-filter-button day-filter-button-active"
+                  : "day-filter-button"
+              }
+              key={day.id}
+              type="button"
+              onClick={() => setSelectedDayId(day.id)}
+            >
+              {day.tabLabel}
+            </button>
+          ))}
+        </nav>
+
         <div className="inscription-days">
-          {academicDays.map((day) => (
+          {visibleDays.map((day) => (
             <section className="academic-day-section" key={day.id}>
               <div className="academic-day-header">
                 <span>{day.dateLabel}</span>
@@ -288,6 +363,10 @@ export default function InscriptionPage() {
                                 <dd>{activity.time}</dd>
                               </div>
                               <div>
+                                <dt>Período</dt>
+                                <dd>{activity.period}</dd>
+                              </div>
+                              <div>
                                 <dt>Vagas</dt>
                                 <dd>{filledSpots} / {capacity}</dd>
                               </div>
@@ -300,7 +379,7 @@ export default function InscriptionPage() {
                                   : "activity-button"
                               }
                               type="button"
-                              onClick={() => void handleRegister(activity)}
+                              onClick={() => openConfirmation(activity)}
                               disabled={buttonState.disabled || selectedActivityId === activity.id}
                             >
                               {selectedActivityId === activity.id
@@ -318,6 +397,86 @@ export default function InscriptionPage() {
           ))}
         </div>
       </section>
+
+      {pendingActivity ? (
+        <div className="confirmation-overlay" role="presentation">
+          <section
+            className="confirmation-dialog"
+            aria-labelledby="confirmation-title"
+            aria-modal="true"
+            role="dialog"
+          >
+            {confirmationStep === "warning" ? (
+              <>
+                <span className="confirmation-kicker">Atenção</span>
+                <h2 id="confirmation-title">Confirme antes de continuar</h2>
+                <p>
+                  Você está escolhendo <strong>{pendingActivity.title}</strong>.
+                  Após confirmar, não será possível alterar ou remover essa
+                  inscrição pelo sistema.
+                </p>
+                <div className="confirmation-summary">
+                  <span>{pendingActivity.dateLabel}</span>
+                  <span>{pendingActivity.shiftLabel}</span>
+                  <span>{pendingActivity.time}</span>
+                  <span>{pendingActivity.room}</span>
+                </div>
+                <div className="confirmation-actions">
+                  <button
+                    className="confirmation-secondary-button"
+                    type="button"
+                    onClick={closeConfirmation}
+                  >
+                    Cancelar
+                  </button>
+                  <button
+                    className="confirmation-primary-button"
+                    type="button"
+                    onClick={() => setConfirmationStep("typing")}
+                  >
+                    Próximo
+                  </button>
+                </div>
+              </>
+            ) : (
+              <>
+                <span className="confirmation-kicker">Última confirmação</span>
+                <h2 id="confirmation-title">Digite Confirmar</h2>
+                <p>
+                  Para concluir sua inscrição, digite exatamente a palavra
+                  <strong> Confirmar</strong> no campo abaixo.
+                </p>
+                <label className="confirmation-field">
+                  <span>Palavra de confirmação</span>
+                  <input
+                    autoFocus
+                    value={confirmationText}
+                    onChange={(event) => setConfirmationText(event.target.value)}
+                    placeholder="Confirmar"
+                  />
+                </label>
+                <div className="confirmation-actions">
+                  <button
+                    className="confirmation-secondary-button"
+                    type="button"
+                    onClick={closeConfirmation}
+                  >
+                    Cancelar
+                  </button>
+                  <button
+                    className="confirmation-primary-button"
+                    type="button"
+                    onClick={() => void handleFinalConfirmation()}
+                    disabled={confirmationText !== "Confirmar" || Boolean(selectedActivityId)}
+                  >
+                    {selectedActivityId ? "Salvando..." : "Confirmar"}
+                  </button>
+                </div>
+              </>
+            )}
+          </section>
+        </div>
+      ) : null}
     </main>
   );
 }

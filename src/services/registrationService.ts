@@ -1,6 +1,5 @@
 import {
   collection,
-  deleteDoc,
   doc,
   getDocs,
   increment,
@@ -19,16 +18,6 @@ import type {
 
 const REGISTRATIONS_COLLECTION = "registrations";
 const ACTIVITY_COUNTERS_COLLECTION = "activityCounters";
-const STUDENT_SLOT_COLLECTION = "studentRegistrationSlots";
-const STUDENT_ACTIVITY_GROUP_COLLECTION = "studentActivityGroups";
-
-function buildSlotId(userId: string, dayId: string, shift: string) {
-  return `${userId}_${dayId}_${shift}`;
-}
-
-function buildActivityGroupSelectionId(userId: string, activityGroupId: string) {
-  return `${userId}_${activityGroupId}`;
-}
 
 function parseRegistrationDocument(
   documentId: string,
@@ -53,6 +42,7 @@ function parseRegistrationDocument(
     activityDescription: String(data.activityDescription ?? ""),
     dayId: String(data.dayId ?? ""),
     dateLabel: String(data.dateLabel ?? ""),
+    activityPeriod: String(data.activityPeriod ?? "Integral") as StudentRegistration["activityPeriod"],
     shift: String(data.shift ?? "morning") as StudentRegistration["shift"],
     shiftLabel: String(data.shiftLabel ?? ""),
     room: String(data.room ?? ""),
@@ -95,10 +85,6 @@ export async function getActivityAvailabilities(activityIds: string[]) {
     throw new Error("Firebase não está configurado.");
   }
 
-  if (activityIds.length === 0) {
-    return new Map<string, ActivityAvailability>();
-  }
-
   const countersSnapshot = await getDocs(collection(db, ACTIVITY_COUNTERS_COLLECTION));
   const requestedActivityIds = new Set(activityIds);
   const availabilityMap = new Map<string, ActivityAvailability>();
@@ -135,15 +121,45 @@ export async function getActivityAvailabilities(activityIds: string[]) {
   return availabilityMap;
 }
 
+function validateStudentRules(
+  activityId: string,
+  studentRegistrations: StudentRegistration[],
+) {
+  const activity = getActivityById(activityId);
+
+  if (!activity) {
+    throw new Error("Atividade não encontrada.");
+  }
+
+  const hasSameShiftRegistration = studentRegistrations.some((registration) => {
+    return registration.dayId === activity.dayId && registration.shift === activity.shift;
+  });
+
+  if (hasSameShiftRegistration) {
+    throw new Error("Você já escolheu uma atividade nesse turno.");
+  }
+
+  const hasSameActivityGroup = studentRegistrations.some((registration) => {
+    return registration.activityGroupId === activity.groupId;
+  });
+
+  if (hasSameActivityGroup) {
+    throw new Error("Essa atividade já foi escolhida em outro horário.");
+  }
+
+  return activity;
+}
+
 export async function registerStudentActivity(input: RegisterStudentActivityInput) {
   if (!db) {
     throw new Error("Firebase não está configurado.");
   }
 
-  const activity = getActivityById(input.activityId);
+  const studentRegistrations = await getStudentRegistrations(input.userId);
+  const activity = validateStudentRules(input.activityId, studentRegistrations);
 
-  if (!activity) {
-    throw new Error("Atividade não encontrada.");
+  if (activity.period !== input.studentPeriod) {
+    throw new Error("Essa atividade não pertence ao seu período.");
   }
 
   const registrationRef = doc(
@@ -152,36 +168,15 @@ export async function registerStudentActivity(input: RegisterStudentActivityInpu
     `${input.userId}_${activity.id}`,
   );
   const counterRef = doc(db, ACTIVITY_COUNTERS_COLLECTION, activity.id);
-  const slotRef = doc(
-    db,
-    STUDENT_SLOT_COLLECTION,
-    buildSlotId(input.userId, activity.dayId, activity.shift),
-  );
-  const activityGroupRef = doc(
-    db,
-    STUDENT_ACTIVITY_GROUP_COLLECTION,
-    buildActivityGroupSelectionId(input.userId, activity.groupId),
-  );
 
   await runTransaction(db, async (transaction) => {
-    const [registrationSnapshot, counterSnapshot, slotSnapshot, activityGroupSnapshot] =
-      await Promise.all([
-        transaction.get(registrationRef),
-        transaction.get(counterRef),
-        transaction.get(slotRef),
-        transaction.get(activityGroupRef),
-      ]);
+    const [registrationSnapshot, counterSnapshot] = await Promise.all([
+      transaction.get(registrationRef),
+      transaction.get(counterRef),
+    ]);
 
     if (registrationSnapshot.exists()) {
       throw new Error("Você já está inscrito nessa atividade.");
-    }
-
-    if (slotSnapshot.exists()) {
-      throw new Error("Você já escolheu uma atividade nesse turno.");
-    }
-
-    if (activityGroupSnapshot.exists()) {
-      throw new Error("Essa atividade já foi escolhida em outro turno.");
     }
 
     const filledSpots = Number(counterSnapshot.data()?.filledSpots ?? 0);
@@ -190,7 +185,7 @@ export async function registerStudentActivity(input: RegisterStudentActivityInpu
       throw new Error("As vagas dessa atividade estão esgotadas.");
     }
 
-    const registrationData = {
+    transaction.set(registrationRef, {
       userId: input.userId,
       studentName: input.studentName,
       studentEmail: input.studentEmail,
@@ -206,78 +201,24 @@ export async function registerStudentActivity(input: RegisterStudentActivityInpu
       activityDescription: activity.description,
       dayId: activity.dayId,
       dateLabel: activity.dateLabel,
+      activityPeriod: activity.period,
       shift: activity.shift,
       shiftLabel: activity.shiftLabel,
       room: activity.room,
       time: activity.time,
       capacity: activity.capacity,
       registeredAt: serverTimestamp(),
-    };
-
-    transaction.set(registrationRef, registrationData);
-    transaction.set(slotRef, {
-      userId: input.userId,
-      dayId: activity.dayId,
-      shift: activity.shift,
-      activityId: activity.id,
-      registrationId: registrationRef.id,
-    });
-    transaction.set(activityGroupRef, {
-      userId: input.userId,
-      activityGroupId: activity.groupId,
-      activityId: activity.id,
-      registrationId: registrationRef.id,
     });
     transaction.set(
       counterRef,
       {
         activityId: activity.id,
+        activityTitle: activity.title,
+        activityPeriod: activity.period,
         capacity: activity.capacity,
         filledSpots: increment(1),
       },
       { merge: true },
     );
   });
-}
-
-export async function deleteStudentRegistration(registration: StudentRegistration) {
-  if (!db) {
-    throw new Error("Firebase não está configurado.");
-  }
-
-  const firestore = db;
-
-  await runTransaction(firestore, async (transaction) => {
-    const registrationRef = doc(firestore, REGISTRATIONS_COLLECTION, registration.id);
-    const counterRef = doc(firestore, ACTIVITY_COUNTERS_COLLECTION, registration.activityId);
-    const slotRef = doc(
-      firestore,
-      STUDENT_SLOT_COLLECTION,
-      buildSlotId(registration.userId, registration.dayId, registration.shift),
-    );
-    const activityGroupRef = doc(
-      firestore,
-      STUDENT_ACTIVITY_GROUP_COLLECTION,
-      buildActivityGroupSelectionId(registration.userId, registration.activityGroupId),
-    );
-
-    transaction.delete(registrationRef);
-    transaction.delete(slotRef);
-    transaction.delete(activityGroupRef);
-    transaction.set(
-      counterRef,
-      {
-        filledSpots: increment(-1),
-      },
-      { merge: true },
-    );
-  });
-}
-
-export async function deleteRegistrationDocument(registrationId: string) {
-  if (!db) {
-    throw new Error("Firebase não está configurado.");
-  }
-
-  await deleteDoc(doc(db, REGISTRATIONS_COLLECTION, registrationId));
 }
