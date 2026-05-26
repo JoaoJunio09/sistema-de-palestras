@@ -1,10 +1,8 @@
 export type CourseId =
-  | "infonet"
   | "adm"
+  | "informatica"
   | "rh"
-  | "ds"
-  | "agro-a"
-  | "agro-b";
+  | "ds";
 
 export type CoursePeriod = "Integral" | "Noturno";
 

@@ -293,109 +293,123 @@ export default function InscriptionPage() {
 
         {feedback ? <p className="inscription-feedback">{feedback}</p> : null}
 
-        <nav className="day-filter-tabs" aria-label="Filtrar atividades por dia">
-          {availableDays.map((day) => (
-            <button
-              className={
-                activeDayId === day.id
-                  ? "day-filter-button day-filter-button-active"
-                  : "day-filter-button"
-              }
-              key={day.id}
-              type="button"
-              onClick={() => setSelectedDayId(day.id)}
-            >
-              {day.tabLabel}
-            </button>
-          ))}
-        </nav>
+        {availableDays.length > 0 ? (
+          <>
+            <nav className="day-filter-tabs" aria-label="Filtrar atividades por dia">
+              {availableDays.map((day) => (
+                <button
+                  className={
+                    activeDayId === day.id
+                      ? "day-filter-button day-filter-button-active"
+                      : "day-filter-button"
+                  }
+                  key={day.id}
+                  type="button"
+                  onClick={() => setSelectedDayId(day.id)}
+                >
+                  {day.tabLabel}
+                </button>
+              ))}
+            </nav>
 
-        <div className="inscription-days">
-          {visibleDays.map((day) => (
-            <section className="academic-day-section" key={day.id}>
-              <div className="academic-day-header">
-                <span>{day.dateLabel}</span>
-                <h2>{day.title}</h2>
-              </div>
+            <div className="inscription-days">
+              {visibleDays.map((day) => (
+                <section className="academic-day-section" key={day.id}>
+                  <div className="academic-day-header">
+                    <span>{day.dateLabel}</span>
+                    <h2>{day.title}</h2>
+                  </div>
 
-              <div className="shift-sections">
-                {groupActivitiesByShift(day.activities).map((shiftGroup) => (
-                  <section className="shift-section" key={`${day.id}-${shiftGroup.shift}`}>
-                    <div className="shift-header">
-                      <h3>{shiftGroup.shiftLabel}</h3>
-                      <span>{shiftGroup.activities.length} atividade(s)</span>
-                    </div>
+                  <div className="shift-sections">
+                    {groupActivitiesByShift(day.activities).map((shiftGroup) => (
+                      <section className="shift-section" key={`${day.id}-${shiftGroup.shift}`}>
+                        <div className="shift-header">
+                          <h3>{shiftGroup.shiftLabel}</h3>
+                          <span>{shiftGroup.activities.length} atividade(s)</span>
+                        </div>
 
-                    <div className="activity-grid">
-                      {shiftGroup.activities.map((activity) => {
-                        const availability = availabilityMap.get(activity.id);
-                        const filledSpots = availability?.filledSpots ?? 0;
-                        const capacity = availability?.capacity ?? activity.capacity;
-                        const availableSpots = Math.max(capacity - filledSpots, 0);
-                        const buttonState = getButtonState(activity);
+                        <div className="activity-grid">
+                          {shiftGroup.activities.map((activity) => {
+                            const availability = availabilityMap.get(activity.id);
+                            const filledSpots = availability?.filledSpots ?? 0;
+                            const capacity = availability?.capacity ?? activity.capacity;
+                            const availableSpots = Math.max(capacity - filledSpots, 0);
+                            const buttonState = getButtonState(activity);
 
-                        return (
-                          <article className="activity-card" key={activity.id}>
-                            <div className="activity-card-topline">
-                              <span>{activity.type}</span>
-                              <strong>
-                                {availableSpots > 0
-                                  ? `${availableSpots} vaga(s)`
-                                  : "Esgotado"}
-                              </strong>
-                            </div>
+                            return (
+                              <article className="activity-card" key={activity.id}>
+                                <div className="activity-card-topline">
+                                  <span>{activity.type}</span>
+                                  <strong>
+                                    {availableSpots > 0
+                                      ? `${availableSpots} vaga(s)`
+                                      : "Esgotado"}
+                                  </strong>
+                                </div>
 
-                            <h4>{activity.title}</h4>
+                                <h4>{activity.title}</h4>
 
-                            <p>{activity.description}</p>
+                                <p>{activity.description}</p>
 
-                            <dl className="activity-details">
-                              <div>
-                                <dt>Palestrante(s)</dt>
-                                <dd>{activity.speakers.join(", ")}</dd>
-                              </div>
-                              <div>
-                                <dt>Sala</dt>
-                                <dd>{activity.room}</dd>
-                              </div>
-                              <div>
-                                <dt>Horário</dt>
-                                <dd>{activity.time}</dd>
-                              </div>
-                              <div>
-                                <dt>Período</dt>
-                                <dd>{activity.period}</dd>
-                              </div>
-                              <div>
-                                <dt>Vagas</dt>
-                                <dd>{filledSpots} / {capacity}</dd>
-                              </div>
-                            </dl>
+                                <dl className="activity-details">
+                                  <div>
+                                    <dt>Palestrante(s)</dt>
+                                    <dd>{activity.speakers.join(", ")}</dd>
+                                  </div>
+                                  <div>
+                                    <dt>Sala</dt>
+                                    <dd>{activity.room}</dd>
+                                  </div>
+                                  <div>
+                                    <dt>Horário</dt>
+                                    <dd>{activity.time}</dd>
+                                  </div>
+                                  <div>
+                                    <dt>Período</dt>
+                                    <dd>{activity.period}</dd>
+                                  </div>
+                                  <div>
+                                    <dt>Vagas</dt>
+                                    <dd>{filledSpots} / {capacity}</dd>
+                                  </div>
+                                </dl>
 
-                            <button
-                              className={
-                                buttonState.label === "Inscrito"
-                                  ? "activity-button activity-button-confirmed"
-                                  : "activity-button"
-                              }
-                              type="button"
-                              onClick={() => openConfirmation(activity)}
-                              disabled={buttonState.disabled || selectedActivityId === activity.id}
-                            >
-                              {selectedActivityId === activity.id
-                                ? "Salvando..."
-                                : buttonState.label}
-                            </button>
-                          </article>
-                        );
-                      })}
-                    </div>
-                  </section>
-                ))}
-              </div>
-            </section>
-          ))}
-        </div>
+                                <button
+                                  className={
+                                    buttonState.label === "Inscrito"
+                                      ? "activity-button activity-button-confirmed"
+                                      : "activity-button"
+                                  }
+                                  type="button"
+                                  onClick={() => openConfirmation(activity)}
+                                  disabled={buttonState.disabled || selectedActivityId === activity.id}
+                                >
+                                  {selectedActivityId === activity.id
+                                    ? "Salvando..."
+                                    : buttonState.label}
+                                </button>
+                              </article>
+                            );
+                          })}
+                        </div>
+                      </section>
+                    ))}
+                  </div>
+                </section>
+              ))}
+            </div>
+          </>
+        ) : (
+          <section className="academic-day-section">
+            <div className="academic-day-header">
+              <span>{studentProfile?.period}</span>
+              <h2>Nenhuma atividade disponível</h2>
+            </div>
+            <p className="empty-period-message">
+              Ainda não há palestras ou oficinas cadastradas para o seu período.
+            </p>
+          </section>
+        )}
       </section>
 
       {pendingActivity ? (

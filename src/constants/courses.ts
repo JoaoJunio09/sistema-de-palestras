@@ -9,15 +9,15 @@ export type CourseOption = {
 
 export const courseOptions: CourseOption[] = [
   {
-    id: "infonet",
-    label: "Informática para Internet",
-    shortName: "Infonet",
-    period: "Integral",
-  },
-  {
     id: "adm",
     label: "Administração",
     shortName: "ADM",
+    period: "Integral",
+  },
+  {
+    id: "informatica",
+    label: "Informática",
+    shortName: "Informática",
     period: "Integral",
   },
   {
@@ -31,18 +31,6 @@ export const courseOptions: CourseOption[] = [
     label: "Desenvolvimento de Sistemas",
     shortName: "DS",
     period: "Noturno",
-  },
-  {
-    id: "agro-a",
-    label: "Agropecuária (Turma A)",
-    shortName: "Agro A",
-    period: "Integral",
-  },
-  {
-    id: "agro-b",
-    label: "Agropecuária (Turma B)",
-    shortName: "Agro B",
-    period: "Integral",
   },
 ];
 
