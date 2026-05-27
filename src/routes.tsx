@@ -13,7 +13,7 @@ function RoutesApp() {
 				<Routes>
 					<Route path="/" element={<HomePage />} />
 					<Route path="/login" element={<LoginPage />} />
-					<Route path="/admin" element={<AdminPage />} />
+					<Route path="/sac/admin" element={<AdminPage />} />
 					<Route path="/:studentSlug/inscricao" element={<InscriptionPage />} />
 				</Routes>
 			</Suspense>
