@@ -10,7 +10,8 @@ import {
 } from "firebase/firestore";
 import { getActivityById } from "../data/academicActivities";
 import { db } from "../lib/firebase";
-import type { ActivityAvailability } from "../types/activity";
+import { getActivityOverrides, getActivityWithOverride } from "./activityService";
+import type { AcademicActivity, ActivityAvailability } from "../types/activity";
 import type {
   RegisterStudentActivityInput,
   StudentRegistration,
@@ -80,21 +81,62 @@ export async function getStudentRegistrations(userId: string) {
     });
 }
 
+export async function getAllRegistrations() {
+  if (!db) {
+    throw new Error("Firebase não está configurado.");
+  }
+
+  const registrationsSnapshot = await getDocs(collection(db, REGISTRATIONS_COLLECTION));
+
+  return registrationsSnapshot.docs
+    .map((registrationDocument) =>
+      parseRegistrationDocument(
+        registrationDocument.id,
+        registrationDocument.data(),
+      ),
+    )
+    .sort((firstRegistration, secondRegistration) => {
+      const activityOrder = firstRegistration.activityTitle.localeCompare(
+        secondRegistration.activityTitle,
+      );
+
+      if (activityOrder !== 0) {
+        return activityOrder;
+      }
+
+      return firstRegistration.studentName.localeCompare(secondRegistration.studentName);
+    });
+}
+
 export async function getActivityAvailabilities(activityIds: string[]) {
   if (!db) {
     throw new Error("Firebase não está configurado.");
   }
 
+  const activityOverrides = await getActivityOverrides();
   const countersSnapshot = await getDocs(collection(db, ACTIVITY_COUNTERS_COLLECTION));
   const requestedActivityIds = new Set(activityIds);
   const availabilityMap = new Map<string, ActivityAvailability>();
+
+  function getConfiguredActivity(activityId: string) {
+    const activity = getActivityById(activityId);
+
+    if (!activity) {
+      return undefined;
+    }
+
+    return {
+      ...activity,
+      ...activityOverrides.get(activityId),
+    };
+  }
 
   countersSnapshot.docs.forEach((counterDocument) => {
     if (!requestedActivityIds.has(counterDocument.id)) {
       return;
     }
 
-    const activity = getActivityById(counterDocument.id);
+    const activity = getConfiguredActivity(counterDocument.id);
     const data = counterDocument.data();
 
     availabilityMap.set(counterDocument.id, {
@@ -109,7 +151,7 @@ export async function getActivityAvailabilities(activityIds: string[]) {
       return;
     }
 
-    const activity = getActivityById(activityId);
+    const activity = getConfiguredActivity(activityId);
 
     availabilityMap.set(activityId, {
       activityId,
@@ -122,15 +164,9 @@ export async function getActivityAvailabilities(activityIds: string[]) {
 }
 
 function validateStudentRules(
-  activityId: string,
+  activity: AcademicActivity,
   studentRegistrations: StudentRegistration[],
 ) {
-  const activity = getActivityById(activityId);
-
-  if (!activity) {
-    throw new Error("Atividade não encontrada.");
-  }
-
   const hasSameShiftRegistration = studentRegistrations.some((registration) => {
     return registration.dayId === activity.dayId && registration.shift === activity.shift;
   });
@@ -156,7 +192,13 @@ export async function registerStudentActivity(input: RegisterStudentActivityInpu
   }
 
   const studentRegistrations = await getStudentRegistrations(input.userId);
-  const activity = validateStudentRules(input.activityId, studentRegistrations);
+  const activity = await getActivityWithOverride(input.activityId);
+
+  if (!activity) {
+    throw new Error("Atividade não encontrada.");
+  }
+
+  validateStudentRules(activity, studentRegistrations);
 
   if (activity.period !== input.studentPeriod) {
     throw new Error("Essa atividade não pertence ao seu período.");

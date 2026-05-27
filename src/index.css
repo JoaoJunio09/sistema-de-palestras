@@ -5,7 +5,7 @@
 html {
   width: 100%;
   overflow-x: hidden;
-  background: #020617;
+  background: #f4f7fb;
 }
 
 body {
@@ -20,7 +20,7 @@ body {
     BlinkMacSystemFont,
     "Segoe UI",
     sans-serif;
-  background: #020617;
+  background: #f4f7fb;
 }
 
 #root {
@@ -33,7 +33,7 @@ body {
   min-height: 100vh;
   place-items: center;
   color: #7dd3fc;
-  background: #020617;
+  background: #f4f7fb;
   font-weight: 800;
 }
 

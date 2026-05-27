@@ -3,7 +3,6 @@ import { onAuthStateChanged } from "firebase/auth";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import {
   academicDays,
-  getAllAcademicActivities,
   groupActivitiesByShift,
 } from "../../data/academicActivities";
 import { auth, isFirebaseConfigured } from "../../lib/firebase";
@@ -12,6 +11,7 @@ import {
   getStudentRegistrations,
   registerStudentActivity,
 } from "../../services/registrationService";
+import { getAcademicDaysWithOverrides } from "../../services/activityService";
 import { getStudentProfile } from "../../services/studentProfileService";
 import type { AcademicActivity, ActivityAvailability } from "../../types/activity";
 import type { StudentRegistration } from "../../types/registration";
@@ -33,6 +33,7 @@ export default function InscriptionPage() {
     auth && isFirebaseConfigured ? "checking" : "missing-config",
   );
   const [studentProfile, setStudentProfile] = useState<StudentProfile | null>(null);
+  const [activityDays, setActivityDays] = useState(academicDays);
   const [registrations, setRegistrations] = useState<StudentRegistration[]>([]);
   const [availabilityMap, setAvailabilityMap] = useState(
     () => new Map<string, ActivityAvailability>(),
@@ -63,7 +64,7 @@ export default function InscriptionPage() {
       return [];
     }
 
-    return academicDays
+    return activityDays
       .map((day) => ({
         ...day,
         activities: day.activities.filter((activity) => {
@@ -71,7 +72,7 @@ export default function InscriptionPage() {
         }),
       }))
       .filter((day) => day.activities.length > 0);
-  }, [studentProfile]);
+  }, [activityDays, studentProfile]);
 
   const activeDayId = useMemo(() => {
     const hasSelectedDay = availableDays.some((day) => day.id === selectedDayId);
@@ -84,12 +85,14 @@ export default function InscriptionPage() {
   }, [activeDayId, availableDays]);
 
   async function loadRegistrationState(userId: string) {
-    const activities = getAllAcademicActivities();
+    const daysWithOverrides = await getAcademicDaysWithOverrides();
+    const activities = daysWithOverrides.flatMap((day) => day.activities);
     const [studentRegistrations, activityAvailabilities] = await Promise.all([
       getStudentRegistrations(userId),
       getActivityAvailabilities(activities.map((activity) => activity.id)),
     ]);
 
+    setActivityDays(daysWithOverrides);
     setRegistrations(studentRegistrations);
     setAvailabilityMap(activityAvailabilities);
   }
