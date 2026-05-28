@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { onAuthStateChanged } from "firebase/auth";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import {
@@ -44,6 +44,10 @@ export default function InscriptionPage() {
   const [confirmationStep, setConfirmationStep] = useState<ConfirmationStep>("warning");
   const [confirmationText, setConfirmationText] = useState("");
   const [feedback, setFeedback] = useState("");
+
+  // Impede que o onAuthStateChanged recarregue dados em disparos subsequentes
+  // (token refresh, aba voltando do segundo plano), evitando leituras desnecessárias.
+  const hasLoadedRef = useRef(false);
 
   const selectedActivityIds = useMemo(() => {
     return new Set(registrations.map((registration) => registration.activityId));
@@ -133,7 +137,12 @@ export default function InscriptionPage() {
           return;
         }
 
-        await loadRegistrationState(firebaseUser.uid);
+        // Só carrega os dados do Firestore na primeira vez.
+        // Disparos posteriores do onAuthStateChanged não geram novas leituras.
+        if (!hasLoadedRef.current) {
+          hasLoadedRef.current = true;
+          await loadRegistrationState(firebaseUser.uid);
+        }
 
         if (!isActive) {
           return;
@@ -177,7 +186,41 @@ export default function InscriptionPage() {
         studentPeriod: studentProfile.period,
         activityId: activity.id,
       });
-      await loadRegistrationState(studentProfile.uid);
+
+      // Atualiza o estado local sem reler o Firestore.
+      // O resultado visual é idêntico: botão vira "Inscrito" e vagas diminuem.
+      setRegistrations((prev) => [
+        ...prev,
+        {
+          id: crypto.randomUUID(),
+          activityId: activity.id,
+          dayId: activity.dayId,
+          shift: activity.shift,
+          activityGroupId: activity.groupId,
+          userId: studentProfile.uid,
+          studentName: studentProfile.fullName,
+          studentEmail: studentProfile.email,
+          studentSlug: studentProfile.slug,
+          studentCourseName: studentProfile.courseName,
+          studentCourseShortName: studentProfile.courseShortName,
+          studentPeriod: studentProfile.period,
+        } as StudentRegistration,
+      ]);
+
+      setAvailabilityMap((prev) => {
+        const updated = new Map(prev);
+        const current = updated.get(activity.id);
+
+        if (current) {
+          updated.set(activity.id, {
+            ...current,
+            filledSpots: current.filledSpots + 1,
+          });
+        }
+
+        return updated;
+      });
+
       setFeedback(`Inscrição confirmada em "${activity.title}".`);
     } catch (error) {
       const message =

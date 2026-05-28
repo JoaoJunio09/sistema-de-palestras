@@ -165,24 +165,23 @@ export default function AdminPage() {
   }
 
   async function handleSaveActivity(activity: AcademicActivity) {
-    if (!activityForm) {
-      return;
-    }
+    if (!activityForm) return;
 
-    setIsLoading(true);
-    setFeedback("");
+    const updatedFields = toEditableFields(activityForm);
+    await saveActivityDetails(activity.id, updatedFields);
 
-    try {
-      await saveActivityDetails(activity.id, toEditableFields(activityForm));
-      await loadAdminData();
-      setEditingActivityId("");
-      setActivityForm(null);
-      setFeedback("Atividade atualizada com sucesso.");
-    } catch {
-      setFeedback("Não foi possível salvar as alterações.");
-    } finally {
-      setIsLoading(false);
-    }
+    setDays((currentDays) =>
+      currentDays.map((day) => ({
+        ...day,
+        activities: day.activities.map((a) =>
+          a.id === activity.id ? { ...a, ...updatedFields } : a
+        ),
+      }))
+    );
+
+    setEditingActivityId("");
+    setActivityForm(null);
+    setFeedback("Atividade atualizada com sucesso.");
   }
 
   if (!isAuthenticated) {
