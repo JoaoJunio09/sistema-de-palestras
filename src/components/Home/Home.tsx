@@ -3,7 +3,7 @@ import { homePageContent } from "../../content/HomeContent";
 
 import './Home.css';
 
-import logo from '../../assets/WhatsApp_Image_2026-05-25_at_11.07.57-removebg-preview.png';
+import logo from '../../assets/logo.png';
 
 function Home() {
 	return (
