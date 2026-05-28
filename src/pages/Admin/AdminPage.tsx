@@ -52,7 +52,15 @@ function inferShiftFromTime(time: string): Pick<AcademicActivity, "shift" | "shi
     return { shift: "slot1030", shiftLabel: "10h30" };
   }
 
-  return { shift: "night", shiftLabel: "Noite" };
+  if (normalizedTime.startsWith("19")) {
+    return { shift: "night1930", shiftLabel: "19h30" };
+  }
+
+  if (normalizedTime.startsWith("21")) {
+    return { shift: "night2130", shiftLabel: "21h30" };
+  }
+
+  return { shift: "night1930", shiftLabel: "19h30" };
 }
 
 function toEditableFields(formData: ActivityFormData): ActivityEditableFields {
