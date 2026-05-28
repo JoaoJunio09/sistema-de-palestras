@@ -4,7 +4,7 @@ import HomePage from "./pages/Home/HomePage";
 
 const LoginPage = lazy(() => import("./pages/Login/LoginPage"));
 const InscriptionPage = lazy(() => import("./pages/Inscription/InscriptionPage"));
-const AdminPage = lazy(() => import("./pages/Admin/AdminPage"));
+// const AdminPage = lazy(() => import("./pages/Admin/AdminPage"));
 
 function RoutesApp() {
 	return (
