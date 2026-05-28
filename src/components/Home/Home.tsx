@@ -3,11 +3,16 @@ import { homePageContent } from "../../content/HomeContent";
 
 import './Home.css';
 
+import logo from '../../assets/WhatsApp_Image_2026-05-25_at_11.07.57-removebg-preview.png';
+
 function Home() {
 	return (
 		<main className="home-page">
       <section className="hero-section" aria-labelledby="home-title">
         <div className="hero-content">
+          <div style={{ display: 'flex', justifyContent: 'center', marginTop: -50 }}>
+            <img src={logo} alt="" style={{ width: 200 }} />
+          </div>
           <h1 id="home-title">{homePageContent.title}</h1>
 
           <p>{homePageContent.description}</p>
