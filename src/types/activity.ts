@@ -2,7 +2,7 @@ import type { CoursePeriod } from "./student";
 
 export type ActivityType = "Palestra" | "Oficina";
 
-export type ActivityShift = "slot0830" | "slot1030" | "night";
+export type ActivityShift = "slot0830" | "slot1030" | "night1930" | "night2130";
 
 export type AcademicActivity = {
   id: string;
