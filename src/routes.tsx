@@ -4,7 +4,7 @@ import HomePage from "./pages/Home/HomePage";
 
 const LoginPage = lazy(() => import("./pages/Login/LoginPage"));
 const InscriptionPage = lazy(() => import("./pages/Inscription/InscriptionPage"));
-// const AdminPage = lazy(() => import("./pages/Admin/AdminPage"));
+const AdminPage = lazy(() => import("./pages/Admin/AdminPage"));
 
 function RoutesApp() {
 	return (
@@ -13,7 +13,7 @@ function RoutesApp() {
 				<Routes>
 					<Route path="/" element={<HomePage />} />
 					<Route path="/login" element={<LoginPage />} />
-					{/* <Route path="/admin" element={<AdminPage />} /> */}
+					<Route path="/admin" element={<AdminPage />} />
 					<Route path="/:studentSlug/inscricao" element={<InscriptionPage />} />
 				</Routes>
 			</Suspense>
