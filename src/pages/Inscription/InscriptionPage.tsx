@@ -119,7 +119,8 @@ export default function InscriptionPage() {
       }
 
       try {
-        const profile = await getStudentProfile(firebaseUser.uid);
+        // DEPOIS
+        const profile = await getStudentProfile(firebaseUser.uid, firebaseUser.email ?? undefined);
 
         if (!isActive) {
           return;

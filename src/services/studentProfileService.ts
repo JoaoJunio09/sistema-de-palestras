@@ -1,4 +1,4 @@
-import { doc, getDoc, serverTimestamp, setDoc } from "firebase/firestore";
+import { collection, doc, getDocs, getDoc, query, serverTimestamp, setDoc, where } from "firebase/firestore";
 import type { User } from "firebase/auth";
 import { findCourseById } from "../constants/courses";
 import { db } from "../lib/firebase";
@@ -31,18 +31,33 @@ function parseStudentProfile(data: Record<string, unknown>): StudentProfile {
   };
 }
 
-export async function getStudentProfile(uid: string) {
+export async function getStudentProfile(uid: string, email?: string) {
   if (!db) {
     throw new Error("Firebase não está configurado.");
   }
 
+  // Tenta primeiro pelo UID (comportamento normal)
   const studentSnapshot = await getDoc(doc(db, STUDENTS_COLLECTION, uid));
 
-  if (!studentSnapshot.exists()) {
-    return null;
+  if (studentSnapshot.exists()) {
+    return parseStudentProfile(studentSnapshot.data());
   }
 
-  return parseStudentProfile(studentSnapshot.data());
+  // UID não encontrado — fallback por email (usado após migração de projeto)
+  if (email) {
+    const emailQuery = query(
+      collection(db, STUDENTS_COLLECTION),
+      where("email", "==", email),
+    );
+
+    const emailSnapshot = await getDocs(emailQuery);
+
+    if (!emailSnapshot.empty) {
+      return parseStudentProfile(emailSnapshot.docs[0].data());
+    }
+  }
+
+  return null;
 }
 
 export async function saveStudentProfile(

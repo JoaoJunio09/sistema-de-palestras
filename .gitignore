@@ -25,3 +25,7 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+credentials-palestra.json
+credentials-palestra-2.json
+backup-palestra.json

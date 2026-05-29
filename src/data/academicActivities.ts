@@ -767,6 +767,23 @@ export const academicDays: AcademicDay[] = [
         time: "21h30",
         capacity: MAX_ACTIVITY_CAPACITY,
       },
+      {
+        id: "marketplace-ecommerce-night-2130-0206",
+        groupId: "night-2130-marketplace-ecommerce-0206",
+        type: "Palestra",
+        title: "Marketplace e o Mundo do E-commerce",
+        speakers: ["Nahany Ushida"],
+        description:
+          "Palestra sobre marketplaces, vendas online, e-commerce e oportunidades no mercado digital.",
+        dayId: "2026-06-02",
+        dateLabel: "02/06",
+        period: "Noturno",
+        shift: "night2130",
+        shiftLabel: "2ª bateria - 21h30",
+        room: "Sala F",
+        time: "21h30",
+        capacity: MAX_ACTIVITY_CAPACITY,
+      },
     ],
   },
 ];

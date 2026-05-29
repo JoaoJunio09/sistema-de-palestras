@@ -62,7 +62,8 @@ export default function LoginPage() {
       setUser(firebaseUser);
 
       try {
-        const studentProfile = await getStudentProfile(firebaseUser.uid);
+        // DEPOIS
+        const studentProfile = await getStudentProfile(firebaseUser.uid, firebaseUser.email ?? undefined);
 
         if (!isActive) {
           return;
@@ -109,7 +110,9 @@ export default function LoginPage() {
 
     try {
       const credential = await signInWithPopup(auth, googleProvider);
-      const studentProfile = await getStudentProfile(credential.user.uid);
+
+      // DEPOIS
+      const studentProfile = await getStudentProfile(credential.user.uid, credential.user.email ?? undefined);
 
       if (studentProfile) {
         navigate(`${buildStudentPanelPath(studentProfile.slug)}/inscricao`, { replace: true });
