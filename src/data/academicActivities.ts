@@ -670,6 +670,22 @@ export const academicDays: AcademicDay[] = [
         time: "19h30",
         capacity: MAX_ACTIVITY_CAPACITY,
       },
+      {
+        id: "oratoria-night-1930-0206",
+        groupId: "night-1930-oratoria-0206",
+        type: "Palestra",
+        title: "Do Assunto à Apresentação",
+        speakers: ["Lorena Nunes", "Lucas Lima"],
+        description: "Planejamento de apresentação e oratória.",
+        dayId: "2026-06-02",
+        dateLabel: "02/06",
+        period: "Noturno",
+        shift: "night1930",
+        shiftLabel: "1ª bateria - 19h30",
+        room: "Sala F",
+        time: "19h30",
+        capacity: MAX_ACTIVITY_CAPACITY,
+      },
       // ── Noturno 21h30 (2ª bateria) ────────────────────────────────
       {
         id: "saude-mental-night-2130-0206",
