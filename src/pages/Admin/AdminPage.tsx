@@ -29,6 +29,13 @@ type ActivityFormData = {
   capacity: string;
 };
 
+type Filters = {
+  dayId: string;
+  shift: string;
+  period: string;
+  search: string;
+};
+
 function createActivityFormData(activity: AcademicActivity): ActivityFormData {
   return {
     title: activity.title,
@@ -47,15 +54,12 @@ function inferShiftFromTime(time: string): Pick<AcademicActivity, "shift" | "shi
   if (normalizedTime.startsWith("8")) {
     return { shift: "slot0830", shiftLabel: "8h30" };
   }
-
   if (normalizedTime.startsWith("10")) {
     return { shift: "slot1030", shiftLabel: "10h30" };
   }
-
   if (normalizedTime.startsWith("19")) {
     return { shift: "night1930", shiftLabel: "19h30" };
   }
-
   if (normalizedTime.startsWith("21")) {
     return { shift: "night2130", shiftLabel: "21h30" };
   }
@@ -70,7 +74,7 @@ function toEditableFields(formData: ActivityFormData): ActivityEditableFields {
     title: formData.title.trim(),
     speakers: formData.speakers
       .split(",")
-      .map((speaker) => speaker.trim())
+      .map((s) => s.trim())
       .filter(Boolean),
     description: formData.description.trim(),
     room: formData.room.trim(),
@@ -82,55 +86,95 @@ function toEditableFields(formData: ActivityFormData): ActivityEditableFields {
   };
 }
 
+const SHIFT_LABELS: Record<string, string> = {
+  slot0830: "8h30",
+  slot1030: "10h30",
+  night1930: "19h30",
+  night2130: "21h30",
+};
+
 export default function AdminPage() {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
-  const [loginForm, setLoginForm] = useState<AdminLoginForm>({
-    username: "",
-    password: "",
-  });
+  const [loginForm, setLoginForm] = useState<AdminLoginForm>({ username: "", password: "" });
   const [days, setDays] = useState<AcademicDay[]>([]);
   const [registrations, setRegistrations] = useState<StudentRegistration[]>([]);
   const [editingActivityId, setEditingActivityId] = useState("");
   const [activityForm, setActivityForm] = useState<ActivityFormData | null>(null);
   const [feedback, setFeedback] = useState("");
   const [isLoading, setIsLoading] = useState(false);
+  const [hasLoaded, setHasLoaded] = useState(false);
+
+  const [filters, setFilters] = useState<Filters>({
+    dayId: "",
+    shift: "",
+    period: "",
+    search: "",
+  });
+
+  const [appliedFilters, setAppliedFilters] = useState<Filters | null>(null);
+
+  // ── derived data ──────────────────────────────────────────────────────────
 
   const registrationsByActivityId = useMemo(() => {
-    const registrationsMap = new Map<string, StudentRegistration[]>();
-
-    registrations.forEach((registration) => {
-      const currentRegistrations = registrationsMap.get(registration.activityId) ?? [];
-      registrationsMap.set(registration.activityId, [
-        ...currentRegistrations,
-        registration,
-      ]);
+    const map = new Map<string, StudentRegistration[]>();
+    registrations.forEach((reg) => {
+      const current = map.get(reg.activityId) ?? [];
+      map.set(reg.activityId, [...current, reg]);
     });
-
-    return registrationsMap;
+    return map;
   }, [registrations]);
 
-  const totals = useMemo(() => {
-    const activities = days.flatMap((day) => day.activities);
+  const allActivities = useMemo(
+    () => days.flatMap((day) => day.activities),
+    [days],
+  );
 
-    return {
-      activities: activities.length,
-      registrations: registrations.length,
-      students: new Set(registrations.map((registration) => registration.userId)).size,
-    };
-  }, [days, registrations]);
+  // Unique days / shifts / periods for filter dropdowns
+  const filterOptions = useMemo(() => {
+    const uniqueDays = days.map((d) => ({ id: d.id, label: `${d.dateLabel} — ${d.title}` }));
+    const uniqueShifts = [...new Set(allActivities.map((a) => a.shift))];
+    const uniquePeriods = [...new Set(allActivities.map((a) => a.period))];
+    return { uniqueDays, uniqueShifts, uniquePeriods };
+  }, [days, allActivities]);
+
+  const totals = useMemo(() => ({
+    activities: allActivities.length,
+    registrations: registrations.length,
+    students: new Set(registrations.map((r) => r.userId)).size,
+  }), [allActivities, registrations]);
+
+  // Filtered activities (only shown after "Aplicar filtros")
+  const filteredActivities = useMemo(() => {
+    if (!appliedFilters) return [];
+
+    return allActivities.filter((activity) => {
+      if (appliedFilters.dayId && activity.dayId !== appliedFilters.dayId) return false;
+      if (appliedFilters.shift && activity.shift !== appliedFilters.shift) return false;
+      if (appliedFilters.period && activity.period !== appliedFilters.period) return false;
+      if (appliedFilters.search) {
+        const q = appliedFilters.search.toLowerCase();
+        const matchTitle = activity.title.toLowerCase().includes(q);
+        const matchSpeaker = activity.speakers.some((s) => s.toLowerCase().includes(q));
+        const matchRoom = activity.room.toLowerCase().includes(q);
+        if (!matchTitle && !matchSpeaker && !matchRoom) return false;
+      }
+      return true;
+    });
+  }, [allActivities, appliedFilters]);
+
+  // ── data loading ──────────────────────────────────────────────────────────
 
   const loadAdminData = useCallback(async () => {
     setIsLoading(true);
     setFeedback("");
-
     try {
       const [daysWithOverrides, allRegistrations] = await Promise.all([
         getAcademicDaysWithOverrides(),
         getAllRegistrations(),
       ]);
-
       setDays(daysWithOverrides);
       setRegistrations(allRegistrations);
+      setHasLoaded(true);
     } catch {
       setFeedback("Não foi possível carregar os dados do painel.");
     } finally {
@@ -138,17 +182,14 @@ export default function AdminPage() {
     }
   }, []);
 
+  // ── handlers ──────────────────────────────────────────────────────────────
+
   function handleLogin(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-
-    if (
-      loginForm.username !== ADMIN_USERNAME ||
-      loginForm.password !== ADMIN_PASSWORD
-    ) {
+    if (loginForm.username !== ADMIN_USERNAME || loginForm.password !== ADMIN_PASSWORD) {
       setFeedback("Usuário ou senha inválidos.");
       return;
     }
-
     setIsAuthenticated(true);
     void loadAdminData();
   }
@@ -157,6 +198,18 @@ export default function AdminPage() {
     setIsAuthenticated(false);
     setDays([]);
     setRegistrations([]);
+    setAppliedFilters(null);
+    setHasLoaded(false);
+  }
+
+  function handleApplyFilters() {
+    setAppliedFilters({ ...filters });
+  }
+
+  function handleClearFilters() {
+    const empty: Filters = { dayId: "", shift: "", period: "", search: "" };
+    setFilters(empty);
+    setAppliedFilters(null);
   }
 
   function startEditing(activity: AcademicActivity) {
@@ -174,15 +227,17 @@ export default function AdminPage() {
       currentDays.map((day) => ({
         ...day,
         activities: day.activities.map((a) =>
-          a.id === activity.id ? { ...a, ...updatedFields } : a
+          a.id === activity.id ? { ...a, ...updatedFields } : a,
         ),
-      }))
+      })),
     );
 
     setEditingActivityId("");
     setActivityForm(null);
     setFeedback("Atividade atualizada com sucesso.");
   }
+
+  // ── login screen ──────────────────────────────────────────────────────────
 
   if (!isAuthenticated) {
     return (
@@ -196,29 +251,17 @@ export default function AdminPage() {
               <span>Usuário</span>
               <input
                 value={loginForm.username}
-                onChange={(event) =>
-                  setLoginForm((currentForm) => ({
-                    ...currentForm,
-                    username: event.target.value,
-                  }))
-                }
+                onChange={(e) => setLoginForm((f) => ({ ...f, username: e.target.value }))}
               />
             </label>
-
             <label>
               <span>Senha</span>
               <input
                 type="password"
                 value={loginForm.password}
-                onChange={(event) =>
-                  setLoginForm((currentForm) => ({
-                    ...currentForm,
-                    password: event.target.value,
-                  }))
-                }
+                onChange={(e) => setLoginForm((f) => ({ ...f, password: e.target.value }))}
               />
             </label>
-
             <button type="submit">Entrar</button>
           </form>
 
@@ -228,6 +271,8 @@ export default function AdminPage() {
     );
   }
 
+  // ── main screen ───────────────────────────────────────────────────────────
+
   return (
     <main className="admin-page">
       <section className="admin-shell">
@@ -236,7 +281,6 @@ export default function AdminPage() {
             <h1>Dashboard administrativo</h1>
             <p>Gerencie inscrições, atividades e relatórios da Semana Acadêmica.</p>
           </div>
-
           <div className="admin-header-actions">
             <button type="button" onClick={() => void loadAdminData()}>
               {isLoading ? "Atualizando..." : "Atualizar dados"}
@@ -247,6 +291,7 @@ export default function AdminPage() {
           </div>
         </header>
 
+        {/* Summary */}
         <div className="admin-summary-grid">
           <article>
             <span>Atividades</span>
@@ -264,204 +309,242 @@ export default function AdminPage() {
 
         {feedback ? <p className="admin-feedback">{feedback}</p> : null}
 
-        <div className="admin-days">
-          {days.map((day) => (
-            <section className="admin-day-card" key={day.id}>
-              <div className="admin-day-title">
-                <span>{day.dateLabel}</span>
-                <h2>{day.title}</h2>
-              </div>
+        {/* Filters */}
+        {hasLoaded && (
+          <section className="admin-filters">
+            <h2>Filtrar atividades</h2>
 
-              <div className="admin-activity-list">
-                {day.activities.map((activity) => {
-                  const activityRegistrations =
-                    registrationsByActivityId.get(activity.id) ?? [];
-                  const isEditing = editingActivityId === activity.id;
+            <div className="admin-filters-grid">
+              <label>
+                <span>Dia</span>
+                <select
+                  value={filters.dayId}
+                  onChange={(e) => setFilters((f) => ({ ...f, dayId: e.target.value }))}
+                >
+                  <option value="">Todos os dias</option>
+                  {filterOptions.uniqueDays.map((d) => (
+                    <option key={d.id} value={d.id}>{d.label}</option>
+                  ))}
+                </select>
+              </label>
 
-                  return (
-                    <article className="admin-activity-card" key={activity.id}>
-                      <div className="admin-activity-header">
-                        <div>
-                          <span>{activity.time} • {activity.room}</span>
-                          <h3>{activity.title}</h3>
-                          <p>{activity.speakers.join(", ")}</p>
-                        </div>
+              <label>
+                <span>Horário</span>
+                <select
+                  value={filters.shift}
+                  onChange={(e) => setFilters((f) => ({ ...f, shift: e.target.value }))}
+                >
+                  <option value="">Todos os horários</option>
+                  {filterOptions.uniqueShifts.map((s) => (
+                    <option key={s} value={s}>{SHIFT_LABELS[s] ?? s}</option>
+                  ))}
+                </select>
+              </label>
 
-                        <strong>{activityRegistrations.length} / {activity.capacity}</strong>
-                      </div>
+              <label>
+                <span>Período</span>
+                <select
+                  value={filters.period}
+                  onChange={(e) => setFilters((f) => ({ ...f, period: e.target.value }))}
+                >
+                  <option value="">Todos os períodos</option>
+                  {filterOptions.uniquePeriods.map((p) => (
+                    <option key={p} value={p}>{p}</option>
+                  ))}
+                </select>
+              </label>
 
-                      {isEditing && activityForm ? (
-                        <div className="admin-edit-grid">
-                          <label>
-                            <span>Título</span>
-                            <input
-                              value={activityForm.title}
-                              onChange={(event) =>
-                                setActivityForm((currentForm) =>
-                                  currentForm
-                                    ? { ...currentForm, title: event.target.value }
-                                    : currentForm,
-                                )
-                              }
-                            />
-                          </label>
-                          <label>
-                            <span>Palestrante(s)</span>
-                            <input
-                              value={activityForm.speakers}
-                              onChange={(event) =>
-                                setActivityForm((currentForm) =>
-                                  currentForm
-                                    ? { ...currentForm, speakers: event.target.value }
-                                    : currentForm,
-                                )
-                              }
-                            />
-                          </label>
-                          <label>
-                            <span>Sala</span>
-                            <input
-                              value={activityForm.room}
-                              onChange={(event) =>
-                                setActivityForm((currentForm) =>
-                                  currentForm
-                                    ? { ...currentForm, room: event.target.value }
-                                    : currentForm,
-                                )
-                              }
-                            />
-                          </label>
-                          <label>
-                            <span>Horário</span>
-                            <input
-                              value={activityForm.time}
-                              onChange={(event) =>
-                                setActivityForm((currentForm) =>
-                                  currentForm
-                                    ? { ...currentForm, time: event.target.value }
-                                    : currentForm,
-                                )
-                              }
-                            />
-                          </label>
-                          <label>
-                            <span>Vagas</span>
-                            <input
-                              value={activityForm.capacity}
-                              onChange={(event) =>
-                                setActivityForm((currentForm) =>
-                                  currentForm
-                                    ? { ...currentForm, capacity: event.target.value }
-                                    : currentForm,
-                                )
-                              }
-                            />
-                          </label>
-                          <label>
-                            <span>Período</span>
-                            <select
-                              value={activityForm.period}
-                              onChange={(event) =>
-                                setActivityForm((currentForm) =>
-                                  currentForm
-                                    ? {
-                                        ...currentForm,
-                                        period: event.target.value as AcademicActivity["period"],
-                                      }
-                                    : currentForm,
-                                )
-                              }
-                            >
-                              <option value="Integral">Integral</option>
-                              <option value="Noturno">Noturno</option>
-                            </select>
-                          </label>
-                          <label className="admin-edit-full">
-                            <span>Descrição</span>
-                            <textarea
-                              value={activityForm.description}
-                              onChange={(event) =>
-                                setActivityForm((currentForm) =>
-                                  currentForm
-                                    ? { ...currentForm, description: event.target.value }
-                                    : currentForm,
-                                )
-                              }
-                            />
-                          </label>
-                        </div>
-                      ) : null}
+              <label>
+                <span>Buscar</span>
+                <input
+                  placeholder="Palestra, palestrante ou sala..."
+                  value={filters.search}
+                  onChange={(e) => setFilters((f) => ({ ...f, search: e.target.value }))}
+                  onKeyDown={(e) => e.key === "Enter" && handleApplyFilters()}
+                />
+              </label>
+            </div>
 
-                      <div className="admin-activity-actions">
-                        {isEditing ? (
-                          <>
-                            <button
-                              type="button"
-                              onClick={() => void handleSaveActivity(activity)}
-                            >
-                              Salvar
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => {
-                                setEditingActivityId("");
-                                setActivityForm(null);
-                              }}
-                            >
-                              Cancelar
-                            </button>
-                          </>
-                        ) : (
-                          <button type="button" onClick={() => startEditing(activity)}>
-                            Editar atividade
-                          </button>
-                        )}
+            <div className="admin-filters-actions">
+              <button type="button" onClick={handleApplyFilters}>
+                Aplicar filtros
+              </button>
+              <button type="button" onClick={handleClearFilters}>
+                Limpar
+              </button>
+            </div>
 
-                        <button
-                          type="button"
-                          onClick={() =>
-                            generateActivityReportPdf(activity, activityRegistrations)
+            {appliedFilters && (
+              <p className="admin-filter-result">
+                {filteredActivities.length === 0
+                  ? "Nenhuma atividade encontrada com esses filtros."
+                  : `${filteredActivities.length} atividade(s) encontrada(s).`}
+              </p>
+            )}
+          </section>
+        )}
+
+        {/* Activity list — only shown after filter is applied */}
+        {appliedFilters && filteredActivities.length > 0 && (
+          <div className="admin-days">
+            {filteredActivities.map((activity) => {
+              const activityRegistrations = registrationsByActivityId.get(activity.id) ?? [];
+              const isEditing = editingActivityId === activity.id;
+              const dayTitle = days.find((d) => d.id === activity.dayId)?.title ?? "";
+
+              return (
+                <article className="admin-activity-card" key={activity.id}>
+                  <div className="admin-activity-header">
+                    <div>
+                      <span>
+                        {activity.dateLabel} • {activity.time} • {activity.room} • {activity.period}
+                        {dayTitle ? ` • ${dayTitle}` : ""}
+                      </span>
+                      <h3>{activity.title}</h3>
+                      <p>{activity.speakers.join(", ")}</p>
+                    </div>
+                    <strong>{activityRegistrations.length} / {activity.capacity}</strong>
+                  </div>
+
+                  {isEditing && activityForm ? (
+                    <div className="admin-edit-grid">
+                      <label>
+                        <span>Título</span>
+                        <input
+                          value={activityForm.title}
+                          onChange={(e) =>
+                            setActivityForm((f) => f ? { ...f, title: e.target.value } : f)
+                          }
+                        />
+                      </label>
+                      <label>
+                        <span>Palestrante(s)</span>
+                        <input
+                          value={activityForm.speakers}
+                          onChange={(e) =>
+                            setActivityForm((f) => f ? { ...f, speakers: e.target.value } : f)
+                          }
+                        />
+                      </label>
+                      <label>
+                        <span>Sala</span>
+                        <input
+                          value={activityForm.room}
+                          onChange={(e) =>
+                            setActivityForm((f) => f ? { ...f, room: e.target.value } : f)
+                          }
+                        />
+                      </label>
+                      <label>
+                        <span>Horário</span>
+                        <input
+                          value={activityForm.time}
+                          onChange={(e) =>
+                            setActivityForm((f) => f ? { ...f, time: e.target.value } : f)
+                          }
+                        />
+                      </label>
+                      <label>
+                        <span>Vagas</span>
+                        <input
+                          value={activityForm.capacity}
+                          onChange={(e) =>
+                            setActivityForm((f) => f ? { ...f, capacity: e.target.value } : f)
+                          }
+                        />
+                      </label>
+                      <label>
+                        <span>Período</span>
+                        <select
+                          value={activityForm.period}
+                          onChange={(e) =>
+                            setActivityForm((f) =>
+                              f ? { ...f, period: e.target.value as AcademicActivity["period"] } : f,
+                            )
                           }
                         >
-                          Gerar PDF
-                        </button>
-                      </div>
+                          <option value="Integral">Integral</option>
+                          <option value="Noturno">Noturno</option>
+                        </select>
+                      </label>
+                      <label className="admin-edit-full">
+                        <span>Descrição</span>
+                        <textarea
+                          value={activityForm.description}
+                          onChange={(e) =>
+                            setActivityForm((f) => f ? { ...f, description: e.target.value } : f)
+                          }
+                        />
+                      </label>
+                    </div>
+                  ) : null}
 
-                      <div className="admin-registration-table-wrapper">
-                        <table className="admin-registration-table">
-                          <thead>
-                            <tr>
-                              <th>Aluno</th>
-                              <th>Curso</th>
-                              <th>Período</th>
-                              <th>E-mail</th>
+                  <div className="admin-activity-actions">
+                    {isEditing ? (
+                      <>
+                        <button type="button" onClick={() => void handleSaveActivity(activity)}>
+                          Salvar
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => { setEditingActivityId(""); setActivityForm(null); }}
+                        >
+                          Cancelar
+                        </button>
+                      </>
+                    ) : (
+                      <button type="button" onClick={() => startEditing(activity)}>
+                        Editar atividade
+                      </button>
+                    )}
+                    <button
+                      type="button"
+                      onClick={() => generateActivityReportPdf(activity, activityRegistrations)}
+                    >
+                      Gerar PDF
+                    </button>
+                  </div>
+
+                  <div className="admin-registration-table-wrapper">
+                    <table className="admin-registration-table">
+                      <thead>
+                        <tr>
+                          <th>Aluno</th>
+                          <th>Curso</th>
+                          <th>Período</th>
+                          <th>E-mail</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {activityRegistrations.length > 0 ? (
+                          activityRegistrations.map((reg) => (
+                            <tr key={reg.id}>
+                              <td>{reg.studentName}</td>
+                              <td>{reg.studentCourseName}</td>
+                              <td>{reg.studentPeriod}</td>
+                              <td>{reg.studentEmail}</td>
                             </tr>
-                          </thead>
-                          <tbody>
-                            {activityRegistrations.length > 0 ? (
-                              activityRegistrations.map((registration) => (
-                                <tr key={registration.id}>
-                                  <td>{registration.studentName}</td>
-                                  <td>{registration.studentCourseName}</td>
-                                  <td>{registration.studentPeriod}</td>
-                                  <td>{registration.studentEmail}</td>
-                                </tr>
-                              ))
-                            ) : (
-                              <tr>
-                                <td colSpan={4}>Nenhum aluno inscrito.</td>
-                              </tr>
-                            )}
-                          </tbody>
-                        </table>
-                      </div>
-                    </article>
-                  );
-                })}
-              </div>
-            </section>
-          ))}
-        </div>
+                          ))
+                        ) : (
+                          <tr>
+                            <td colSpan={4}>Nenhum aluno inscrito.</td>
+                          </tr>
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
+                </article>
+              );
+            })}
+          </div>
+        )}
+
+        {/* Empty state before first filter */}
+        {!appliedFilters && hasLoaded && (
+          <div className="admin-empty-state">
+            <p>Use os filtros acima para buscar atividades e visualizar inscrições.</p>
+          </div>
+        )}
       </section>
     </main>
   );

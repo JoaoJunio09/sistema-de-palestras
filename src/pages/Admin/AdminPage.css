@@ -1,3 +1,85 @@
+/* ── Filters ─────────────────────────────────────────────────────────────── */
+
+.admin-filters {
+  background: var(--color-surface, #f9f9f9);
+  border: 1px solid var(--color-border, #e2e8f0);
+  border-radius: 8px;
+  padding: 1.5rem;
+  margin-bottom: 2rem;
+}
+
+.admin-filters h2 {
+  font-size: 1rem;
+  font-weight: 600;
+  margin: 0 0 1rem;
+}
+
+.admin-filters-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 1rem;
+  margin-bottom: 1rem;
+}
+
+.admin-filters-grid label {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  font-size: 0.85rem;
+  font-weight: 500;
+}
+
+.admin-filters-grid select,
+.admin-filters-grid input {
+  padding: 0.5rem 0.75rem;
+  border: 1px solid var(--color-border, #e2e8f0);
+  border-radius: 6px;
+  font-size: 0.9rem;
+  background: white;
+}
+
+.admin-filters-actions {
+  display: flex;
+  gap: 0.75rem;
+}
+
+.admin-filters-actions button {
+  padding: 0.5rem 1.25rem;
+  border-radius: 6px;
+  font-size: 0.9rem;
+  font-weight: 500;
+  cursor: pointer;
+  border: none;
+}
+
+.admin-filters-actions button:first-child {
+  background: var(--color-primary, #3b82f6);
+  color: white;
+}
+
+.admin-filters-actions button:last-child {
+  background: transparent;
+  border: 1px solid var(--color-border, #e2e8f0);
+  color: var(--color-text, #374151);
+}
+
+.admin-filter-result {
+  margin-top: 0.75rem;
+  font-size: 0.85rem;
+  color: var(--color-text-muted, #6b7280);
+}
+
+/* ── Empty state ─────────────────────────────────────────────────────────── */
+
+.admin-empty-state {
+  text-align: center;
+  padding: 3rem 1rem;
+  color: var(--color-text-muted, #6b7280);
+  font-size: 0.95rem;
+  border: 1px dashed var(--color-border, #e2e8f0);
+  border-radius: 8px;
+}
+
 .admin-page {
   height: 100vh;
   width: 100%;
